@@ -1,10 +1,5 @@
 --!native
 
-local CleanupModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/altyaacct/Rspy/refs/heads/main/Cleanup"))()
-local HookModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/altyaacct/Rspy/refs/heads/main/Hook"))()
-local UIGenModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/altyaacct/Rspy/refs/heads/main/UiGen"))()
-local CodeGenModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/altyaacct/Rspy/refs/heads/main/CodeGen"))()
-
 local bypassSuccess = false
 local detectedFunc, killFunc
 local hookedACFunctions = {}
@@ -1087,8 +1082,70 @@ function makeToolTip(enable, text)
     end
 end
 
-local newButton = UIGenModule.newButton(ScrollingFrame, TweenService, Create, makeToolTip, logthread, running, updateFunctionCanvas)
-local newRemote = UIGenModule.newRemote(LogList, Create, TweenService, layoutOrderNum, updateRemoteCanvas, remoteLogs, logs, clean)
+function newButton(name, description, onClick)
+    local FunctionTemplate = Create("Frame",{Name = "FunctionTemplate",Parent = ScrollingFrame,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,Size = UDim2.new(0, 117, 0, 23)})
+    local ColorBar = Create("Frame",{Name = "ColorBar",Parent = FunctionTemplate,BackgroundColor3 = Color3.new(1, 1, 1),BorderSizePixel = 0,Position = UDim2.new(0, 7, 0, 10),Size = UDim2.new(0, 7, 0, 18),ZIndex = 3})
+    local Text = Create("TextLabel",{Text = name,Name = "Text",Parent = FunctionTemplate,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,Position = UDim2.new(0, 19, 0, 10),Size = UDim2.new(0, 69, 0, 18),ZIndex = 2,Font = Enum.Font.SourceSans,TextColor3 = Color3.new(1, 1, 1),TextSize = 14,TextStrokeColor3 = Color3.new(0.145098, 0.141176, 0.14902),TextXAlignment = Enum.TextXAlignment.Left})
+    local Button = Create("TextButton",{Name = "Button",Parent = FunctionTemplate,BackgroundColor3 = Color3.new(0, 0, 0),BackgroundTransparency = 0.69999998807907,BorderColor3 = Color3.new(1, 1, 1),Position = UDim2.new(0, 7, 0, 10),Size = UDim2.new(0, 80, 0, 18),AutoButtonColor = false,Font = Enum.Font.SourceSans,Text = "",TextColor3 = Color3.new(0, 0, 0),TextSize = 14})
+
+    Button.MouseEnter:Connect(function()
+        makeToolTip(true, description())
+    end)
+    Button.MouseLeave:Connect(function()
+        makeToolTip(false)
+    end)
+    FunctionTemplate.AncestryChanged:Connect(function()
+        makeToolTip(false)
+    end)
+    Button.MouseButton1Click:Connect(function(...)
+        logthread(running())
+        onClick(FunctionTemplate, ...)
+    end)
+    updateFunctionCanvas()
+end
+
+function newRemote(type, data)
+    if layoutOrderNum < 1 then layoutOrderNum = 999999999 end
+    local remote = data.remote
+    local callingscript = data.callingscript
+
+    local RemoteTemplate = Create("Frame",{LayoutOrder = layoutOrderNum,Name = "RemoteTemplate",Parent = LogList,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,Size = UDim2.new(0, 117, 0, 27)})
+    local ColorBar = Create("Frame",{Name = "ColorBar",Parent = RemoteTemplate,BackgroundColor3 = (type == "event" and Color3.fromRGB(255, 242, 0)) or Color3.fromRGB(99, 86, 245),BorderSizePixel = 0,Position = UDim2.new(0, 0, 0, 1),Size = UDim2.new(0, 7, 0, 18),ZIndex = 2})
+    local Text = Create("TextLabel",{TextTruncate = Enum.TextTruncate.AtEnd,Name = "Text",Parent = RemoteTemplate,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,Position = UDim2.new(0, 12, 0, 1),Size = UDim2.new(0, 105, 0, 18),ZIndex = 2,Font = Enum.Font.SourceSans,Text = remote.Name,TextColor3 = Color3.new(1, 1, 1),TextSize = 14,TextXAlignment = Enum.TextXAlignment.Left})
+    local Button = Create("TextButton",{Name = "Button",Parent = RemoteTemplate,BackgroundColor3 = Color3.new(0, 0, 0),BackgroundTransparency = 0.75,BorderColor3 = Color3.new(1, 1, 1),Position = UDim2.new(0, 0, 0, 1),Size = UDim2.new(0, 117, 0, 18),AutoButtonColor = false,Font = Enum.Font.SourceSans,Text = "",TextColor3 = Color3.new(0, 0, 0),TextSize = 14})
+
+    local log = {
+        Name = remote.name,
+        Function = data.infofunc or "",
+        Remote = remote,
+        DebugId = data.id,
+        metamethod = data.metamethod,
+        args = data.args,
+        Log = RemoteTemplate,
+        Button = Button,
+        Blocked = data.blocked,
+        Source = callingscript,
+        returnvalue = data.returnvalue,
+        GenScript = ""
+    }
+
+    logs[#logs + 1] = log
+    local connect = Button.MouseButton1Click:Connect(function()
+        logthread(running())
+        eventSelect(RemoteTemplate)
+        log.GenScript = genScript(log.Remote, log.args)
+        if data.blocked then
+            log.GenScript = "" .. log.GenScript
+        end
+        if selected == log and RemoteTemplate then
+            eventSelect(RemoteTemplate)
+        end
+    end)
+    layoutOrderNum -= 1
+    table.insert(remoteLogs, 1, {connect, RemoteTemplate})
+    clean()
+    updateRemoteCanvas()
+end
 
 function genScript(remote, args)
     prevTables = {}
@@ -1260,10 +1317,7 @@ ufunctions = {
     end,
 }
 
-local typeofv2sfunctions
-local typev2sfunctions
-
-typeofv2sfunctions = {
+local typeofv2sfunctions = {
     number = function(v)
         local number = tostring(v)
         return number_table[number] or number
@@ -1295,7 +1349,7 @@ typeofv2sfunctions = {
     end
 }
 
-typev2sfunctions = {
+local typev2sfunctions = {
     userdata = function(v,vtypeof)
         if ufunctions[vtypeof] then
             return ufunctions[vtypeof](v)
@@ -1305,40 +1359,24 @@ typev2sfunctions = {
     vector = ufunctions["Vector3"]
 }
 
+
 function v2s(v, l, p, n, vtv, i, pt, path, tables, tI)
-    return CodeGenModule.v2s(v, l, p, n, vtv, i, pt, path, tables, tI, typeofv2sfunctions, typev2sfunctions)
-end
-
-function t2s(t, l, p, n, vtv, i, pt, path, tables, tI)
-    return CodeGenModule.t2s(t, l, p, n, vtv, i, pt, path, tables, tI, v2s, v2p, scheduleWait, indent, getgenv, rawtostring)
-end
-
-function f2s(f)
-    return CodeGenModule.f2s(f, info, getgenv, v2p, v2s, configs)
-end
-
-function i2p(i,customgen)
-    return CodeGenModule.i2p(i, customgen, getplayer, game, Players, SafeGetService, formatstr, getnilrequired)
-end
-
-function getplayer(instance)
-    for _, v in next, Players:GetPlayers() do
-        if v.Character and (instance:IsDescendantOf(v.Character) or instance == v.Character) then
-            return v
-        end
+    local vtypeof = typeof(v)
+    local vtypeoffunc = typeofv2sfunctions[vtypeof]
+    local vtypefunc = typev2sfunctions[type(v)]
+    local vtype = type(v)
+    if not tI then
+        tI = {0}
+    else
+        tI[1] += 1
     end
-end
 
-function v2p(x, t, path, prev)
-    return CodeGenModule.v2p(x, t, path, prev, v2s)
-end
-
-function formatstr(s, indentation)
-    return CodeGenModule.formatstr(s, indentation, handlespecials)
-end
-
-function handlespecials(s, indentation)
-    return CodeGenModule.handlespecials(s, indentation, string, create, resume, status, RunService, clear, getgenv)
+    if vtypeoffunc then
+        return vtypeoffunc(v, l, p, n, vtv, i, pt, path, tables, tI)
+    elseif vtypefunc then
+        return vtypefunc(v,vtypeof)
+    end
+    return `{vtypeof}({rawtostring(v)})`
 end
 
 function v2v(t)
@@ -1367,6 +1405,290 @@ function v2v(t)
         ret = ret .. bottomstr
     end
     return ret
+end
+
+function tabletostring(tbl: table,format: boolean)
+    
+end
+
+function t2s(t, l, p, n, vtv, i, pt, path, tables, tI)
+    local globalIndex = table.find(getgenv(), t)
+    if type(globalIndex) == "string" then
+        return globalIndex
+    end
+    if not tI then
+        tI = {0}
+    end
+    if not path then
+        path = ""
+    end
+    if not l then
+        l = 0
+        tables = {}
+    end
+    if not p then
+        p = t
+    end
+    for _, v in next, tables do
+        if n and rawequal(v, t) then
+            bottomstr = bottomstr .. "\n" .. rawtostring(n) .. rawtostring(path) .. " = " .. rawtostring(n) .. rawtostring(({v2p(v, p)})[2])
+            return "{}"
+        end
+    end
+    table.insert(tables, t)
+    local s =  "{"
+    local size = 0
+    l += indent
+    for k, v in next, t do
+        size = size + 1
+        if size > (getgenv().SimpleSpyMaxTableSize or 1000) then
+            s = s .. "\n" .. string.rep(" ", l)
+            break
+        end
+        if rawequal(k, t) then
+            bottomstr ..= `\n{n}{path}[{n}{path}] = {(rawequal(v,k) and `{n}{path}` or v2s(v, l, p, n, vtv, k, t, `{path}[{n}{path}]`, tables))}`
+            size -= 1
+            continue
+        end
+        local currentPath = ""
+        if type(k) == "string" and k:match("^[%a_]+[%w_]*$") then
+            currentPath = "." .. k
+        else
+            currentPath = "[" .. v2s(k, l, p, n, vtv, k, t, path .. currentPath, tables, tI) .. "]"
+        end
+        if size % 100 == 0 then
+            scheduleWait()
+        end
+        s = s .. "\n" .. string.rep(" ", l) .. "[" .. v2s(k, l, p, n, vtv, k, t, path .. currentPath, tables, tI) .. "] = " .. v2s(v, l, p, n, vtv, k, t, path .. currentPath, tables, tI) .. ","
+    end
+    if #s > 1 then
+        s = s:sub(1, #s - 1)
+    end
+    if size > 0 then
+        s = s .. "\n" .. string.rep(" ", l - indent)
+    end
+    return s .. "}"
+end
+
+function f2s(f)
+    for k, x in next, getgenv() do
+        local isgucci, gpath
+        if rawequal(x, f) then
+            isgucci, gpath = true, ""
+        elseif type(x) == "table" then
+            isgucci, gpath = v2p(f, x)
+        end
+        if isgucci and type(k) ~= "function" then
+            if type(k) == "string" and k:match("^[%a_]+[%w_]*$") then
+                return k .. gpath
+            else
+                return "getgenv()[" .. v2s(k) .. "]" .. gpath
+            end
+        end
+    end
+    
+    if configs.funcEnabled then
+        local funcname = info(f,"n")
+        
+        if funcname and funcname:match("^[%a_]+[%w_]*$") then
+            return `function {funcname}() end`
+        end
+    end
+    return tostring(f)
+end
+
+function i2p(i,customgen)
+    if customgen then
+        return customgen
+    end
+    local player = getplayer(i)
+    local parent = i
+    local out = ""
+    if parent == nil then
+        return "nil"
+    elseif player then
+        while true do
+            if parent and parent == player.Character then
+                if player == Players.LocalPlayer then
+                    return 'game:GetService("Players").LocalPlayer.Character' .. out
+                else
+                    return i2p(player) .. ".Character" .. out
+                end
+            else
+                if parent.Name:match("[%a_]+[%w+]*") ~= parent.Name then
+                    out = ':FindFirstChild(' .. formatstr(parent.Name) .. ')' .. out
+                else
+                    out = "." .. parent.Name .. out
+                end
+            end
+            task.wait()
+            parent = parent.Parent
+        end
+    elseif parent ~= game then
+        while true do
+            if parent and parent.Parent == game then
+                if SafeGetService(parent.ClassName) then
+                    if lower(parent.ClassName) == "workspace" then
+                        return `workspace{out}`
+                    else
+                        return 'game:GetService("' .. parent.ClassName .. '")' .. out
+                    end
+                else
+                    if parent.Name:match("[%a_]+[%w_]*") then
+                        return "game." .. parent.Name .. out
+                    else
+                        return 'game:FindFirstChild(' .. formatstr(parent.Name) .. ')' .. out
+                    end
+                end
+            elseif not parent.Parent then
+                getnilrequired = true
+                return 'getNil(' .. formatstr(parent.Name) .. ', "' .. parent.ClassName .. '")' .. out
+            else
+                if parent.Name:match("[%a_]+[%w_]*") ~= parent.Name then
+                    out = ':WaitForChild(' .. formatstr(parent.Name) .. ')' .. out
+                else
+                    out = ':WaitForChild("' .. parent.Name .. '")'..out
+                end
+            end
+            if i:IsDescendantOf(Players.LocalPlayer) then
+                return 'game:GetService("Players").LocalPlayer'..out
+            end
+            parent = parent.Parent
+            task.wait()
+        end
+    else
+        return "game"
+    end
+end
+
+function getplayer(instance)
+    for _, v in next, Players:GetPlayers() do
+        if v.Character and (instance:IsDescendantOf(v.Character) or instance == v.Character) then
+            return v
+        end
+    end
+end
+
+function v2p(x, t, path, prev)
+    if not path then
+        path = ""
+    end
+    if not prev then
+        prev = {}
+    end
+    if rawequal(x, t) then
+        return true, ""
+    end
+    for i, v in next, t do
+        if rawequal(v, x) then
+            if type(i) == "string" and i:match("^[%a_]+[%w_]*$") then
+                return true, (path .. "." .. i)
+            else
+                return true, (path .. "[" .. v2s(i) .. "]")
+            end
+        end
+        if type(v) == "table" then
+            local duplicate = false
+            for _, y in next, prev do
+                if rawequal(y, v) then
+                    duplicate = true
+                end
+            end
+            if not duplicate then
+                table.insert(prev, t)
+                local found
+                found, p = v2p(x, v, path, prev)
+                if found then
+                    if type(i) == "string" and i:match("^[%a_]+[%w_]*$") then
+                        return true, "." .. i .. p
+                    else
+                        return true, "[" .. v2s(i) .. "]" .. p
+                    end
+                end
+            end
+        end
+    end
+    return false, ""
+end
+
+function formatstr(s, indentation)
+    if not indentation then
+        indentation = 0
+    end
+    local handled, reachedMax = handlespecials(s, indentation)
+    return '"' .. handled .. '"' .. (reachedMax and "" or "")
+end
+
+local function isFinished(coroutines: table)
+    for _, v in next, coroutines do
+        if status(v) == "running" then
+            return false
+        end
+    end
+    return true
+end
+
+local specialstrings = {
+    ["\n"] = function(thread,index)
+        resume(thread,index,"\\n")
+    end,
+    ["\t"] = function(thread,index)
+        resume(thread,index,"\\t")
+    end,
+    ["\\"] = function(thread,index)
+        resume(thread,index,"\\\\")
+    end,
+    ['"'] = function(thread,index)
+        resume(thread,index,"\\\"")
+    end
+}
+
+function handlespecials(s, indentation)
+    local i = 0
+    local n = 1
+    local coroutines = {}
+    local coroutineFunc = function(i, r)
+        s = s:sub(0, i - 1) .. r .. s:sub(i + 1, -1)
+    end
+    local timeout = 0
+    repeat
+        i += 1
+        if timeout >= 10 then
+            task.wait()
+            timeout = 0
+        end
+        local char = s:sub(i, i)
+
+        if byte(char) then
+            timeout += 1
+            local c = create(coroutineFunc)
+            table.insert(coroutines, c)
+            local specialfunc = specialstrings[char]
+
+            if specialfunc then
+                specialfunc(c,i)
+                i += 1
+            elseif byte(char) > 126 or byte(char) < 32 then
+                resume(c, i, "\\" .. byte(char))
+                i += #rawtostring(byte(char))
+            end
+            if i >= n * 100 then
+                local extra = string.format('" ..\n%s"', string.rep(" ", indentation + indent))
+                s = s:sub(0, i) .. extra .. s:sub(i + 1, -1)
+                i += #extra
+                n += 1
+            end
+        end
+    until char == "" or i > (getgenv().SimpleSpyMaxStringSize or 10000)
+    while not isFinished(coroutines) do
+        RunService.Heartbeat:Wait()
+    end
+    clear(coroutines)
+    if i > (getgenv().SimpleSpyMaxStringSize or 10000) then
+        s = string.sub(s, 0, getgenv().SimpleSpyMaxStringSize or 10000)
+        return s, true
+    end
+    return s, false
 end
 
 function getScriptFromSrc(src)
@@ -1569,6 +1891,27 @@ local newnamecall = newcclosure(function(...)
     return originalnamecall(...)
 end)
 
+local function disablehooks()
+    if synv3 then
+        unhook(getrawmetatable(game).__namecall,originalnamecall)
+        unhook(Instance.new("RemoteEvent").FireServer, originalEvent)
+        unhook(Instance.new("RemoteFunction").InvokeServer, originalFunction)
+        unhook(Instance.new("UnreliableRemoteEvent").FireServer, originalUnreliableEvent)
+        restorefunction(originalnamecall)
+        restorefunction(originalEvent)
+        restorefunction(originalFunction)
+    else
+        if hookmetamethod then
+            hookmetamethod(game,"__namecall",originalnamecall)
+        else
+            hookfunction(getrawmetatable(game).__namecall,originalnamecall)
+        end
+        hookfunction(Instance.new("RemoteEvent").FireServer, originalEvent)
+        hookfunction(Instance.new("RemoteFunction").InvokeServer, originalFunction)
+        hookfunction(Instance.new("UnreliableRemoteEvent").FireServer, originalUnreliableEvent)
+    end
+end
+
 function toggleSpy()
     if not toggle then
         local oldnamecall
@@ -1603,7 +1946,7 @@ function toggleSpy()
             return oldnamecall(...)
         end
     else
-        HookModule.disableHooks(synv3, hookmetamethod, hookfunction, getrawmetatable, game, originalnamecall, originalEvent, originalFunction, originalUnreliableEvent, unhook, restorefunction)
+        disablehooks()
     end
 end
 
@@ -1963,16 +2306,70 @@ function renameNotesTab()
 end
 
 local function shutdown()
-    schedulerconnect = CleanupModule.cleanupScheduler(schedulerconnect)
-    CleanupModule.cleanupConnections(connections)
-    CleanupModule.cleanupThreads(running_threads)
-    CleanupModule.cleanupLogs(logs)
-    CleanupModule.cleanupRemoteLogs(remoteLogs)
     pcall(function()
-        HookModule.disableHooks(synv3, hookmetamethod, hookfunction, getrawmetatable, game, originalnamecall, originalEvent, originalFunction, originalUnreliableEvent, unhook, restorefunction)
+        if schedulerconnect then
+            schedulerconnect:Disconnect()
+            schedulerconnect = nil
+        end
     end)
-    CleanupModule.cleanupGUI(SimpleSpy3, Storage)
-    CleanupModule.restoreMouse()
+    
+    pcall(function()
+        for key, connection in pairs(connections) do
+            if typeof(connection) == "RBXScriptConnection" then
+                connection:Disconnect()
+            end
+            connections[key] = nil
+        end
+    end)
+    
+    pcall(function()
+        for i = #running_threads, 1, -1 do
+            local v = running_threads[i]
+            if v and ThreadIsNotDead(v) then
+                pcall(close, v)
+            end
+            running_threads[i] = nil
+        end
+    end)
+    
+    pcall(function()
+        for i = #logs, 1, -1 do
+            logs[i] = nil
+        end
+    end)
+    
+    pcall(function()
+        for i = #remoteLogs, 1, -1 do
+            local v = remoteLogs[i]
+            if v then
+                if typeof(v[1]) == "RBXScriptConnection" then
+                    pcall(function() v[1]:Disconnect() end)
+                end
+                if typeof(v[2]) == "Instance" then
+                    pcall(function() v[2]:Destroy() end)
+                end
+            end
+            remoteLogs[i] = nil
+        end
+    end)
+    
+    pcall(disablehooks)
+    
+    pcall(function()
+        if SimpleSpy3 then
+            SimpleSpy3:Destroy()
+        end
+    end)
+    
+    pcall(function()
+        if Storage then
+            Storage:Destroy()
+        end
+    end)
+    
+    pcall(function()
+        UserInputService.MouseIconEnabled = true
+    end)
     
     getgenv().SimpleSpyExecuted = false
     getgenv().SimpleSpyShutdown = nil
